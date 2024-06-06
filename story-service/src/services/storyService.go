@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"mime/multipart"
 
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 )
@@ -37,6 +36,29 @@ func GetStoryByID(id string) (models.Story, error) {
 	}
 }
 
-func GenerateStory(file *multipart.FileHeader) {
-	fmt.Println("Process file")
+// SaveMessage save message to PostgreSQL database
+func SaveMessage(userID, sessionID string, message models.Message) error {
+	stmt := "INSERT INTO chat_sessions(user_id, session_id, message, sender) VALUES ($1, $2, $3, $4)"
+	_, err := models.Db.Exec(stmt, userID, sessionID, message.Content, message.Sender)
+	return err
+}
+
+// LoadMessage load messages from PostgreSQL database
+func LoadMessages(sessionID string) ([]models.Message, error) {
+	stmt := "SELECT message, sender FROM chat_sessions WHERE session_id = $1 ORDER BY timestamp"
+	rows, err := models.Db.Query(stmt, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []models.Message
+	for rows.Next() {
+		var message models.Message
+		if err := rows.Scan(&message.Content, &message.Sender); err != nil {
+			return nil, err
+		}
+		messages = append(messages, message)
+	}
+	return messages, nil
 }

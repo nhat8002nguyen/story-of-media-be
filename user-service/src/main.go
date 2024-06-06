@@ -6,7 +6,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/router"
-	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/scripts"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +16,7 @@ func main() {
 		log.Fatal("Error loading .env file.")
 	}
 
-	scripts.SeedData()
+	// scripts.SeedData()
 	models.InitDB()
 
 	r := gin.Default()

@@ -10,9 +10,6 @@ func SetupRouter(r *gin.Engine) {
 	api := r.Group("/api")
 	{
 		api.POST("/upload", handlers.UploadData)
-		api.GET("/story/:id", handlers.GetStory)
-		api.POST("/story/:id/question", handlers.AskQuestion)
-		api.GET("/stories", handlers.GetAllStories)
-		api.POST("/connect-stories", handlers.ConnectStories)
+		api.GET("/story/ws", handlers.WsHandler)
 	}
 }

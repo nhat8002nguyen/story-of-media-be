@@ -1,4 +1,4 @@
-package scripts
+package main
 
 import (
 	"context"
@@ -6,12 +6,18 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
+type User struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // Placeholder data as per your JavaScript file
-var users = []models.User{
+var users = []User{
 	{
 		ID:       "13c1f7d1-8c16-4d76-944d-6f6ae930c99d",
 		Name:     "Nhat Nguyen",
@@ -63,7 +69,7 @@ func seedUsers(pool *pgxpool.Pool) error {
 	return nil
 }
 
-func SeedData() {
+func SeedUserService() {
 	dbURL := "postgres://nhatnguyen@localhost:5432/postgres"
 
 	poolConfig, err := pgxpool.ParseConfig(dbURL)
