@@ -51,5 +51,35 @@ func SeedStoryService() {
 		log.Fatalf("Error seeding users: %v", err)
 	}
 
+	if err := seedUploads(pool); err != nil {
+		log.Fatalf("Error seeding users: %v", err)
+	}
+
 	log.Println("Database seeding completed successfully!")
+}
+
+func seedUploads(pool *pgxpool.Pool) error {
+	ctx := context.Background()
+	_, err := pool.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`)
+	if err != nil {
+		return fmt.Errorf("error creating extension: %w", err)
+	}
+
+	sqlStmt := `CREATE TABLE session_files (
+		id SERIAL PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		session_id TEXT NOT NULL,
+		filename VARCHAR(255) NOT NULL,
+		content_type TEXT NOT NULL,
+		file_data BYTEA NOT NULL,
+		upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	_, err = pool.Exec(ctx, sqlStmt)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Seeded stories data.")
+	return nil
 }
