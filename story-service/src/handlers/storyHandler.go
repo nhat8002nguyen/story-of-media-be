@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -42,17 +43,18 @@ func CreateGenAIClient() error {
 
 func UploadData(c *gin.Context) {
 	file, _ := c.FormFile("file")
-	filename := filepath.Base(file.Filename)
 
 	user_id := c.Query("user_id")
 	session_id := c.Query("session_id")
 
-	// Saving the uploaded file to local disk (or temporary storage)
-	uploadPath := fmt.Sprintf("/uploads/%s", filename)
-	c.SaveUploadedFile(file, uploadPath)
+	if err := services.SaveFileData(user_id, session_id, file); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	gemini := genaiClient.GenerativeModel(modelName)
 	gemini.SetTemperature(1)
+
 	resp, err := generateContentFromFile(c, gemini, file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -65,7 +67,7 @@ func UploadData(c *gin.Context) {
 		return
 	}
 
-	story := models.Message{Content: content, Sender: "ai"}
+	story := models.Message{Content: content, Sender: "model"}
 	err = services.SaveMessage(user_id, session_id, story)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -94,7 +96,6 @@ func generateContentFromFile(
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 
 	prompt := "Generate a details story to describe this file"
-
 	switch ext {
 	case ".jpg":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpg", fileBytes))
@@ -133,22 +134,22 @@ func WsHandler(c *gin.Context) {
 	gemini := genaiClient.GenerativeModel(modelName)
 	chat := gemini.StartChat()
 
-	// Load previous messages from the database
-	messages, err := services.LoadMessages(sessionID)
+	chat.History, err = services.LoadChatHistory(userID, sessionID)
 	if err != nil {
-		log.Printf("error loading messages: %v", err)
+		conn.WriteJSON(gin.H{"error": err.Error()})
 		return
 	}
-	for _, msg := range messages {
-		// Check if the message is from the client
-		if msg.Sender == "client" {
-			// Send historical client messages to the gemini chat to maintain context
-			_, err := makeChatRequests(c, chat, msg.Content)
-			if err != nil {
-				log.Printf("error sending historical message: %v", err)
-				return
-			}
-		}
+
+	historyData, err := json.Marshal(chat.History)
+	if err != nil {
+		conn.WriteJSON(gin.H{"error": err.Error()})
+		return
+	}
+
+	// Send the response back to the WebSocket client
+	if err := conn.WriteMessage(websocket.TextMessage, historyData); err != nil {
+		log.Println("write:", err)
+		return
 	}
 
 	for {
@@ -169,12 +170,12 @@ func WsHandler(c *gin.Context) {
 
 		// Save the user message and the response to the database
 		if err := services.SaveMessage(
-			userID, sessionID, models.Message{Sender: "client", Content: string(message)},
+			userID, sessionID, models.Message{Sender: "user", Content: string(message)},
 		); err != nil {
 			log.Printf("error saving user message: %v", err)
 		}
 		if err := services.SaveMessage(
-			userID, sessionID, models.Message{Sender: "ai", Content: response},
+			userID, sessionID, models.Message{Sender: "model", Content: response},
 		); err != nil {
 			log.Printf("error saving response message: %v", err)
 		}

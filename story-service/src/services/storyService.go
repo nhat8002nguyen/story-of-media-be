@@ -3,7 +3,12 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"log"
+	"mime/multipart"
+	"path/filepath"
 
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 )
 
@@ -61,4 +66,66 @@ func LoadMessages(sessionID string) ([]models.Message, error) {
 		messages = append(messages, message)
 	}
 	return messages, nil
+}
+
+// LoadChatHistory loads chat history from PostgreSQL database
+func LoadChatHistory(userID, sessionID string) ([]*genai.Content, error) {
+	contentType := ""
+	fileData := []byte{}
+	stmt := "SELECT file_data, content_type FROM session_files WHERE user_id=$1 AND session_id=$2"
+	if err := models.Db.QueryRow(stmt, userID, sessionID).Scan(&fileData, &contentType); err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			log.Printf("there is no file of user %s, and session %s", userID, sessionID)
+		default:
+			return nil, err
+		}
+	}
+
+	stmt = "SELECT sender, message FROM chat_sessions WHERE user_id=$1 AND session_id=$2 ORDER BY timestamp"
+	rows, err := models.Db.Query(stmt, userID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// add media data first
+	contents := []*genai.Content{
+		{
+			Role:  "user",
+			Parts: []genai.Part{genai.Blob{MIMEType: contentType, Data: fileData}},
+		},
+	}
+
+	for rows.Next() {
+		var message models.Message
+		if err := rows.Scan(&message.Sender, &message.Content); err != nil {
+			return nil, err
+		}
+		contents = append(contents, &genai.Content{
+			Role:  message.Sender,
+			Parts: []genai.Part{genai.Text(message.Content)},
+		})
+	}
+	return contents, nil
+}
+
+func SaveFileData(userID, sessionID string, file *multipart.FileHeader) error {
+	filename := filepath.Base(file.Filename)
+	contentType := file.Header.Get("content-type")
+	f, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fileData, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	stmt := `INSERT INTO session_files(user_id, session_id, filename, content_type, file_data)
+	VALUES ($1, $2, $3, $4, $5) RETURNING id
+	`
+
+	return models.Db.QueryRow(stmt, userID, sessionID, filename, contentType, fileData).Err()
 }
