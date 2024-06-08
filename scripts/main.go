@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var dbURL string
 
 type User struct {
 	ID       string `json:"id"`
@@ -70,8 +74,6 @@ func seedUsers(pool *pgxpool.Pool) error {
 }
 
 func SeedUserService() {
-	dbURL := "postgres://nhatnguyen@localhost:5432/postgres"
-
 	poolConfig, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		log.Fatalf("Unable to parse database URL: %v", err)
@@ -116,8 +118,6 @@ func seedStories(pool *pgxpool.Pool) error {
 }
 
 func SeedStoryService() {
-	dbURL := "postgres://nhatnguyen@localhost:5432/postgres"
-
 	poolConfig, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		log.Fatalf("Unable to parse database URL: %v", err)
@@ -147,7 +147,7 @@ func seedUploads(pool *pgxpool.Pool) error {
 		return fmt.Errorf("error creating extension: %w", err)
 	}
 
-	sqlStmt := `CREATE TABLE session_files (
+	sqlStmt := `CREATE TABLE IF NOT EXISTS session_files (
 		id SERIAL PRIMARY KEY,
 		user_id TEXT NOT NULL,
 		session_id TEXT NOT NULL,
@@ -167,6 +167,15 @@ func seedUploads(pool *pgxpool.Pool) error {
 }
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file.")
+	} else {
+		log.Println("Loaded .env")
+	}
+
+	dbURL = os.Getenv("dbURL")
+
 	SeedUserService()
 	SeedStoryService()
 }
