@@ -4,30 +4,35 @@ FROM golang:1.21-alpine AS build
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy go.mod and go.sum files
+# Copy go mod and sum files
 COPY go.mod go.sum ./
+COPY .env .env
+COPY analyzing-media-files-web-app.json analyzing-media-files-web-app.json
 
 # Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
 
 # Copy the source code into the container
-COPY ./src ./src
+COPY src/ src/
 
 # Build the Go app
-RUN go build -o main ./src/main.go
+RUN go build -o main ./src
 
 # Use scratch as the base image for a minimal container
 FROM alpine:latest
 
-# Set user permissions for security
-RUN adduser -D myuser
-USER myuser
+WORKDIR /root/
 
-# Copy the compiled Go binary from the build stage
-COPY --from=build /app/main /app/main
+# Copy the pre-built binary and .env from the builder stage
+COPY --from=build /app/main .
+COPY --from=build /app/.env .env
+COPY --from=build /app/analyzing-media-files-web-app.json analyzing-media-files-web-app.json
 
-# Expose the port the service will run on
+# Set permissions for the .env file (optional but good practice)
+RUN chmod 644 .env
+
+# Indicate the port that the container app will listen on
 EXPOSE 8080
 
 # Command to run the executable
-ENTRYPOINT ["/app/main"]
+ENTRYPOINT ["./main"]
