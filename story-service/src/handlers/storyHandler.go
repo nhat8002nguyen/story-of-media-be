@@ -4,42 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"reflect"
-	"strings"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/services"
-	"google.golang.org/api/option"
 )
-
-const (
-	projectID = "analyzing-media-files-web-app"
-	location  = "asia-southeast1"
-	modelName = "gemini-1.5-flash-001"
-)
-
-var genaiClient *genai.Client
-
-func CreateGenAIClient() error {
-	var ctx = context.Background()
-	// Ensure the environment variable is set
-	credsFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if credsFile == "" {
-		log.Fatalf("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
-	}
-	var err error
-	genaiClient, err = genai.NewClient(ctx, projectID, location, option.WithCredentialsFile(credsFile))
-	return err
-}
 
 func UploadData(c *gin.Context) {
 	file, _ := c.FormFile("file")
@@ -47,15 +21,17 @@ func UploadData(c *gin.Context) {
 	user_id := c.Query("user_id")
 	session_id := c.Query("session_id")
 
+	if file == nil || user_id == "" || session_id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing values"})
+		return
+	}
+
 	if err := services.SaveFileData(user_id, session_id, file); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	gemini := genaiClient.GenerativeModel(modelName)
-	gemini.SetTemperature(1)
-
-	resp, err := generateContentFromFile(c, gemini, file)
+	resp, err := services.GenerateContentFromFile(c, file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -77,41 +53,6 @@ func UploadData(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"story": story})
 }
 
-func generateContentFromFile(
-	c *gin.Context,
-	gemini *genai.GenerativeModel,
-	file *multipart.FileHeader,
-) (*genai.GenerateContentResponse, error) {
-	f, err := file.Open()
-	if err != nil {
-		return nil, fmt.Errorf("could not open file")
-	}
-	defer f.Close()
-
-	fileBytes, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read file")
-	}
-
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-
-	prompt := "Generate a details story to describe this file"
-	switch ext {
-	case ".jpg":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpg", fileBytes))
-	case ".jpeg":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpeg", fileBytes))
-	case ".png":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("png", fileBytes))
-	case ".pdf":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "application/pdf", Data: fileBytes})
-	case ".txt":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "txt/plain", Data: fileBytes})
-	default:
-		return nil, fmt.Errorf("unknown or unsupported file format")
-	}
-}
-
 // WebSocket Upgrader
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -131,7 +72,7 @@ func WsHandler(c *gin.Context) {
 	userID := c.Query("user_id")
 	sessionID := c.Query("session_id")
 
-	gemini := genaiClient.GenerativeModel(modelName)
+	gemini := services.GenaiClient.GenerativeModel(services.ModelName)
 	chat := gemini.StartChat()
 
 	chat.History, err = services.LoadChatHistory(userID, sessionID)
@@ -205,4 +146,13 @@ func parseContentResponse(r *genai.GenerateContentResponse) (string, error) {
 	} else {
 		return "", fmt.Errorf("not found response text")
 	}
+}
+
+func GetChatHistory(c *gin.Context) {
+	user_id := c.Query("user_id")
+	stories, err := services.GetStories(user_id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+	c.JSON(http.StatusOK, gin.H{"stories": stories})
 }

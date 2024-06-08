@@ -11,7 +11,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source code into the container
-COPY ./src ./src
+COPY . .
+
+# Copy the .env file to the container and set permissions
+COPY ./src/.env ./src/.env
+RUN chmod 644 ./src/.env
 
 # Build the Go app
 RUN go build -o main ./src/main.go
@@ -27,7 +31,7 @@ USER myuser
 COPY --from=build /app/main /app/main
 
 # Expose the port the service will run on
-EXPOSE 8080
+EXPOSE 8081
 
 # Command to run the executable
 ENTRYPOINT ["/app/main"]

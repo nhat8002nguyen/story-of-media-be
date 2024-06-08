@@ -14,6 +14,8 @@ func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file.")
+	} else {
+		log.Println("Loaded .env")
 	}
 
 	// scripts.SeedData()
@@ -21,5 +23,5 @@ func main() {
 
 	r := gin.Default()
 	router.SetupRouter(r)
-	r.Run(":8080")
+	r.Run(":8081")
 }

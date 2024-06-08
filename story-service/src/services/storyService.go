@@ -1,43 +1,75 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
+	"google.golang.org/api/option"
 )
 
-func SaveStory(story models.Story) (models.Story, error) {
-	sqlStatement := `
-        INSERT INTO stories (id, content)
-        VALUES ($1, $2)
-        RETURNING id`
+const (
+	projectID = "analyzing-media-files-web-app"
+	location  = "asia-southeast1"
+	ModelName = "gemini-1.5-flash-001"
+)
 
-	id := ""
-	err := models.Db.QueryRow(sqlStatement, story.ID, story.Content).Scan(&id)
-	if err != nil {
-		return story, err
+var GenaiClient *genai.Client
+
+func CreateGenAIClient() error {
+	var ctx = context.Background()
+	// Ensure the environment variable is set
+	credsFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if credsFile == "" {
+		log.Fatalf("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
 	}
-	story.ID = id
-	return story, nil
+	var err error
+	GenaiClient, err = genai.NewClient(ctx, projectID, location, option.WithCredentialsFile(credsFile))
+	return err
 }
 
-func GetStoryByID(id string) (models.Story, error) {
-	sqlStatement := `SELECT id, content FROM stories WHERE id=$1;`
-	var story models.Story
-	row := models.Db.QueryRow(sqlStatement, id)
-	switch err := row.Scan(&story.ID, &story.Content); err {
-	case sql.ErrNoRows:
-		return story, fmt.Errorf("no records found for story id %s", id)
-	case nil:
-		return story, nil
+func GenerateContentFromFile(
+	c context.Context,
+	file *multipart.FileHeader,
+) (*genai.GenerateContentResponse, error) {
+	f, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("could not open file")
+	}
+	defer f.Close()
+
+	gemini := GenaiClient.GenerativeModel(ModelName)
+	gemini.SetTemperature(1)
+
+	fileBytes, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file")
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+
+	prompt := "Generate a details story to describe this file"
+	switch ext {
+	case ".jpg":
+		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpg", fileBytes))
+	case ".jpeg":
+		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpeg", fileBytes))
+	case ".png":
+		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("png", fileBytes))
+	case ".pdf":
+		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "application/pdf", Data: fileBytes})
+	case ".txt":
+		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "txt/plain", Data: fileBytes})
 	default:
-		return story, err
+		return nil, fmt.Errorf("unknown or unsupported file format")
 	}
 }
 
@@ -128,4 +160,22 @@ func SaveFileData(userID, sessionID string, file *multipart.FileHeader) error {
 	`
 
 	return models.Db.QueryRow(stmt, userID, sessionID, filename, contentType, fileData).Err()
+}
+
+func GetStories(userID string) ([]string, error) {
+	stmt := "SELECT session_id FROM chat_sessions WHERE user_id = $1"
+
+	rows, err := models.Db.Query(stmt, userID)
+	if err != nil {
+		return nil, err
+	}
+	sessionIDs := []string{}
+	sessionID := ""
+	for rows.Next() {
+		if err = rows.Scan(&sessionID); err != nil {
+			return nil, err
+		}
+		sessionIDs = append(sessionIDs, sessionID)
+	}
+	return sessionIDs, nil
 }

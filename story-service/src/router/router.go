@@ -11,5 +11,6 @@ func SetupRouter(r *gin.Engine) {
 	{
 		api.POST("/upload", handlers.UploadData)
 		api.GET("/story/ws", handlers.WsHandler)
+		api.GET("/stories", handlers.GetChatHistory)
 	}
 }

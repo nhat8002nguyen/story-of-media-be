@@ -4,9 +4,9 @@ import (
 	"log"
 
 	"github.com/joho/godotenv"
-	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/handlers"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/router"
+	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +18,7 @@ func init() {
 	}
 	// scripts.SeedData()
 	models.InitDB()
-	err = handlers.CreateGenAIClient()
+	err = services.CreateGenAIClient()
 	if err != nil {
 		log.Fatalf("can not create genai client: %v", err)
 	}
