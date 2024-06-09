@@ -58,7 +58,7 @@ func GenerateContentFromFile(
 
 	prompt := "Generate a details story to describe this file"
 	switch ext {
-	case ".jpg", "jpeg":
+	case ".jpg", ".jpeg":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpeg", fileBytes))
 	case ".png":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("png", fileBytes))
