@@ -58,16 +58,12 @@ func GenerateContentFromFile(
 
 	prompt := "Generate a details story to describe this file"
 	switch ext {
-	case ".jpg":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpg", fileBytes))
-	case ".jpeg":
+	case ".jpg", "jpeg":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("jpeg", fileBytes))
 	case ".png":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.ImageData("png", fileBytes))
 	case ".pdf":
 		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "application/pdf", Data: fileBytes})
-	case ".txt":
-		return gemini.GenerateContent(c, genai.Text(prompt), genai.Blob{MIMEType: "txt/plain", Data: fileBytes})
 	default:
 		return nil, fmt.Errorf("unknown or unsupported file format")
 	}
