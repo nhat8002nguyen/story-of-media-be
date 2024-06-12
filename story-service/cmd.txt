@@ -1,2 +1,2 @@
 sudo docker build -t story-service:latest .
-sudo docker run -d -p 8080:8080 story-service:latest
+sudo docker run -d -p 8080:8080 --name story-service:latest

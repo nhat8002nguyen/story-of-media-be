@@ -11,5 +11,6 @@ func SetupRouter(r *gin.Engine) {
 	{
 		api.GET("/user/:email", handlers.GetUserByEmail)
 		api.POST("/user", handlers.AddUser)
+		api.GET("/login", handlers.LoginHanlder)
 	}
 }

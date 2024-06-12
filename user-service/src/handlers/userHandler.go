@@ -34,3 +34,27 @@ func AddUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "id": user.ID})
 }
+
+func LoginHanlder(c *gin.Context) {
+	u := models.User{}
+	err := c.ShouldBindJSON(&u)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		return
+	}
+	token, err := services.Authenticate(u)
+	if err != nil {
+		if customErr, ok := err.(*services.CustomError); ok {
+			if customErr.Code == services.ERROR_NOT_FOUND {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": customErr.Message})
+				return
+			} else if customErr.Code == services.ERROR_UNAUTHORIZED {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": customErr.Message})
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": customErr.Message})
+			return
+		}
+	}
+
+	c.SetCookie("token", token, 60*60, "/", "story-of-media-ai.vercel.app", true, true)
+}
