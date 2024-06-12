@@ -2,10 +2,12 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/models"
 	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/router"
+	"github.com/nhat8002nguyen/story-of-media-be/story-service/src/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +22,7 @@ func main() {
 
 	// scripts.SeedData()
 	models.InitDB()
+	services.SecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
 	r := gin.Default()
 	router.SetupRouter(r)

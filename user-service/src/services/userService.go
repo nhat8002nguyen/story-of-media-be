@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var secretKey = []byte("qwertyuiop1234567")
+var SecretKey []byte
 
 type Claims struct {
 	Email string
@@ -87,7 +87,7 @@ func Authenticate(creds models.User) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString(secretKey)
+	signedToken, err := token.SignedString(SecretKey)
 	if err != nil {
 		return "", &CustomError{
 			Code:    ERROR_INTERNAL_SERVER,
@@ -96,4 +96,8 @@ func Authenticate(creds models.User) (string, error) {
 	}
 
 	return signedToken, nil
+}
+
+func GetScretKey() []byte {
+	return SecretKey
 }
